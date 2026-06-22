@@ -1,84 +1,63 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { PERSONAS, UTTERANCES, TOPIC } from "./data/mock";
-import type { Persona, Provider } from "./types";
-import { PersonaRail } from "./components/PersonaRail";
-import { Transcript } from "./components/Transcript";
-import { TopicBar } from "./components/TopicBar";
-import { Controls } from "./components/Controls";
-
-const STEP_MS = 1700; // 1発言ごとの間合い(モック演出)
+import { useState } from "react";
+import type { Discussion } from "./types";
+import { SEED_DISCUSSIONS } from "./data/discussions";
+import { useRoute, navigate } from "./router";
+import { DiscussionList } from "./pages/DiscussionList";
+import { DiscussionSetup, type NewDiscussionInput } from "./pages/DiscussionSetup";
+import { Arena } from "./pages/Arena";
 
 export default function App() {
-  const personaMap = useMemo(
-    () => Object.fromEntries(PERSONAS.map((p) => [p.id, p])) as Record<string, Persona>,
-    []
-  );
+  const route = useRoute();
+  const [discussions, setDiscussions] = useState<Discussion[]>(SEED_DISCUSSIONS);
 
-  const [revealed, setRevealed] = useState(0);
-  const [playing, setPlaying] = useState(false);
-  const [provider, setProvider] = useState<Provider>("local");
-  const timer = useRef<number | null>(null);
-
-  const shown = UTTERANCES.slice(0, revealed);
-  const done = revealed >= UTTERANCES.length;
-  const nextSpeaker = !done ? personaMap[UTTERANCES[revealed].personaId] : null;
-  const lastSpeakerId = shown.length ? shown[shown.length - 1].personaId : null;
-  const currentRound = shown.length ? shown[shown.length - 1].round : 0;
-
-  // 再生中は「次に話す人」を、停止中は「直前に話した人」をハイライト
-  const railActive = playing && nextSpeaker ? nextSpeaker.id : lastSpeakerId;
-
-  useEffect(() => {
-    if (!playing || done) return;
-    timer.current = window.setTimeout(() => setRevealed((r) => r + 1), STEP_MS);
-    return () => {
-      if (timer.current) clearTimeout(timer.current);
+  const createDiscussion = (input: NewDiscussionInput) => {
+    const id = "d" + Date.now().toString(36);
+    const d: Discussion = {
+      id,
+      ...input,
+      status: "draft",
+      createdAt: new Date().toISOString().slice(0, 10),
+      utterances: [],
+      summary: "",
+      keyPoints: [],
     };
-  }, [playing, revealed, done]);
+    setDiscussions((list) => [d, ...list]);
+    navigate(`/d/${id}`);
+  };
 
-  useEffect(() => {
-    if (done) setPlaying(false);
-  }, [done]);
+  let body;
+  if (route.name === "setup") {
+    body = <DiscussionSetup onCreate={createDiscussion} />;
+  } else if (route.name === "arena") {
+    const d = discussions.find((x) => x.id === route.id);
+    body = d ? (
+      <Arena discussion={d} />
+    ) : (
+      <section className="page">
+        <p className="muted">
+          議論が見つかりません。{" "}
+          <a className="link" href="#/">
+            一覧へ
+          </a>
+        </p>
+      </section>
+    );
+  } else {
+    body = <DiscussionList discussions={discussions} />;
+  }
 
   return (
     <div className="app">
       <header className="app__header">
-        <div className="app__brand">
+        <a className="app__brand" href="#/">
           <span className="app__seal">會</span>
           <div>
             <h1 className="app__title">先人会議</h1>
             <p className="app__sub">Council of the Ancients — 時を超えた知性の討論</p>
           </div>
-        </div>
+        </a>
       </header>
-
-      <TopicBar
-        topic={TOPIC}
-        round={currentRound}
-        provider={provider}
-        onProvider={setProvider}
-      />
-
-      <div className="app__main">
-        <PersonaRail personas={PERSONAS} activeId={railActive} />
-        <Transcript
-          personas={personaMap}
-          utterances={shown}
-          typingPersona={playing ? nextSpeaker : null}
-        />
-      </div>
-
-      <Controls
-        playing={playing}
-        done={done}
-        atStart={revealed === 0}
-        onPlay={() => setPlaying((v) => !v)}
-        onStep={() => setRevealed((r) => Math.min(r + 1, UTTERANCES.length))}
-        onReset={() => {
-          setPlaying(false);
-          setRevealed(0);
-        }}
-      />
+      {body}
     </div>
   );
 }

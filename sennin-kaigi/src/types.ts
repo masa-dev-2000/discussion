@@ -13,4 +13,19 @@ export interface Utterance {
   text: string;
 }
 
+export type DiscussionStatus = "draft" | "running" | "done";
+
+export interface Discussion {
+  id: string;
+  topic: string; // テーマ
+  goal: string; // ゴール
+  participantIds: string[]; // 対話者(司会を除く)
+  rounds: number; // 想定ラウンド数
+  status: DiscussionStatus;
+  createdAt: string; // 表示用の日付文字列
+  utterances: Utterance[]; // 論壇のログ
+  summary: string; // 流れのまとめ(本文)
+  keyPoints: string[]; // 流れのまとめ(箇条書き)
+}
+
 export type Provider = "local" | "api";
