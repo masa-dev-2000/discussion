@@ -1,6 +1,8 @@
+import { useState } from "react";
 import type { Discussion } from "../types";
 import { personaById } from "../data/personas";
 import { navigate } from "../router";
+import { SummaryModal } from "../components/SummaryModal";
 
 const STATUS_LABEL: Record<string, string> = {
   draft: "下書き",
@@ -9,6 +11,9 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export function DiscussionList({ discussions }: { discussions: Discussion[] }) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const open = discussions.find((d) => d.id === openId) ?? null;
+
   return (
     <section className="page">
       <div className="page__head">
@@ -51,10 +56,23 @@ export function DiscussionList({ discussions }: { discussions: Discussion[] }) {
               <span className="dcard__meta">
                 {d.participantIds.length}名 ・ {d.rounds}ラウンド
               </span>
+              <button
+                className="btn btn--mini"
+                disabled={!d.summary}
+                title={d.summary ? "流れのまとめを見る" : "まだ要約はありません"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpenId(d.id);
+                }}
+              >
+                要約
+              </button>
             </div>
           </li>
         ))}
       </ul>
+
+      {open && <SummaryModal discussion={open} onClose={() => setOpenId(null)} />}
     </section>
   );
 }

@@ -87,26 +87,6 @@ export function Arena({ discussion }: { discussion: Discussion }) {
             </div>
           )}
         </div>
-
-        <aside className="summary">
-          <h3 className="summary__title">流れのまとめ</h3>
-          {discussion.summary ? (
-            <>
-              <p className="summary__text">{discussion.summary}</p>
-              {discussion.keyPoints.length > 0 && (
-                <ul className="summary__points">
-                  {discussion.keyPoints.map((k, i) => (
-                    <li key={i}>{k}</li>
-                  ))}
-                </ul>
-              )}
-            </>
-          ) : (
-            <p className="summary__empty muted">
-              議論が進むと、論点と流れがここに要約されます。
-            </p>
-          )}
-        </aside>
       </div>
 
       {hasLog && (
