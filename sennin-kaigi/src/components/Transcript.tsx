@@ -1,27 +1,32 @@
 import { useEffect, useRef } from "react";
 import type { Persona, Utterance } from "../types";
 
+export interface StreamingState {
+  persona: Persona;
+  text: string; // ここまで届いた本文(空なら思案中)
+}
+
 export function Transcript({
   personas,
   utterances,
-  typingPersona,
+  streaming,
 }: {
   personas: Record<string, Persona>;
   utterances: Utterance[];
-  typingPersona: Persona | null;
+  streaming: StreamingState | null;
 }) {
   const endRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [utterances.length, typingPersona]);
+  }, [utterances.length, streaming?.text]);
 
   let lastRound = 0;
 
   return (
     <main className="transcript">
-      {utterances.length === 0 && !typingPersona && (
+      {utterances.length === 0 && !streaming && (
         <div className="transcript__empty">
-          <p>▶ 再生 で会議が始まります</p>
+          <p>▶ 議論を開始 で会議が始まります</p>
         </div>
       )}
 
@@ -58,27 +63,38 @@ export function Transcript({
         );
       })}
 
-      {typingPersona && (
+      {streaming && (
         <div
-          className="bubble bubble--typing"
-          style={{ ["--accent" as string]: typingPersona.color }}
+          className={
+            "bubble" + (streaming.persona.id === "moderator" ? " bubble--mod" : "")
+          }
+          style={{ ["--accent" as string]: streaming.persona.color }}
         >
-          <span
-            className="bubble__avatar"
-            style={{ background: typingPersona.color }}
-          >
-            {typingPersona.initial}
-          </span>
+          {streaming.persona.id !== "moderator" && (
+            <span
+              className="bubble__avatar"
+              style={{ background: streaming.persona.color }}
+            >
+              {streaming.persona.initial}
+            </span>
+          )}
           <div className="bubble__body">
             <div className="bubble__head">
-              <span className="bubble__name">{typingPersona.name}</span>
-              <span className="bubble__title">思案中…</span>
+              <span className="bubble__name">{streaming.persona.name}</span>
+              <span className="bubble__title">発言中…</span>
             </div>
-            <div className="typing">
-              <span />
-              <span />
-              <span />
-            </div>
+            {streaming.text ? (
+              <p className="bubble__text">
+                {streaming.text}
+                <span className="caret" />
+              </p>
+            ) : (
+              <div className="typing">
+                <span />
+                <span />
+                <span />
+              </div>
+            )}
           </div>
         </div>
       )}

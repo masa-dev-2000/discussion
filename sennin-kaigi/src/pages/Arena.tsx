@@ -1,41 +1,90 @@
-import { useEffect, useRef, useState } from "react";
-import type { Discussion, Provider } from "../types";
+import { useRef, useState } from "react";
+import type { Discussion, Persona, Utterance } from "../types";
 import { personaById, MODERATOR } from "../data/personas";
-import { Transcript } from "../components/Transcript";
-import { Controls } from "../components/Controls";
+import { Transcript, type StreamingState } from "../components/Transcript";
 import { ParticipantStrip } from "../components/ParticipantStrip";
+import { SettingsModal } from "../components/SettingsModal";
+import { useSettings, PROVIDER_LABEL, type ProviderKind } from "../core/settings";
+import { runDiscussion, summarizeDiscussion } from "../core/orchestrator";
 
-const STEP_MS = 1700; // モック再生の間合い
+export function Arena({
+  discussion,
+  onUpdate,
+}: {
+  discussion: Discussion;
+  onUpdate: (id: string, patch: Partial<Discussion>) => void;
+}) {
+  const [settings, setSettings] = useSettings();
+  const [utterances, setUtterances] = useState<Utterance[]>(discussion.utterances);
+  const [streaming, setStreaming] = useState<StreamingState | null>(null);
+  const [running, setRunning] = useState(false);
+  const [summarizing, setSummarizing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
 
-export function Arena({ discussion }: { discussion: Discussion }) {
-  const utts = discussion.utterances;
-  const hasLog = utts.length > 0;
-
-  const [revealed, setRevealed] = useState(0);
-  const [playing, setPlaying] = useState(false);
-  const [provider, setProvider] = useState<Provider>("local");
-  const timer = useRef<number | null>(null);
-
-  const shown = utts.slice(0, revealed);
-  const done = revealed >= utts.length;
-  const next = !done ? personaById[utts[revealed].personaId] : null;
-
-  useEffect(() => {
-    if (!playing || done) return;
-    timer.current = window.setTimeout(() => setRevealed((r) => r + 1), STEP_MS);
-    return () => {
-      if (timer.current) clearTimeout(timer.current);
-    };
-  }, [playing, revealed, done]);
-
-  useEffect(() => {
-    if (done) setPlaying(false);
-  }, [done]);
-
-  const participants = [
+  const participants: Persona[] = [
     MODERATOR,
     ...discussion.participantIds.map((id) => personaById[id]).filter(Boolean),
   ];
+
+  const start = async () => {
+    if (running) return;
+    setError(null);
+    setUtterances([]);
+    setStreaming(null);
+    const ac = new AbortController();
+    abortRef.current = ac;
+    setRunning(true);
+    onUpdate(discussion.id, { status: "running" });
+
+    const collected: Utterance[] = [];
+    try {
+      await runDiscussion(
+        settings,
+        discussion,
+        {
+          onStart: (persona) => setStreaming({ persona, text: "" }),
+          onToken: (t) =>
+            setStreaming((s) => (s ? { ...s, text: s.text + t } : s)),
+          onUtterance: (u) => {
+            collected.push(u);
+            setUtterances((x) => [...x, u]);
+            setStreaming(null);
+          },
+        },
+        ac.signal
+      );
+
+      // B: 要約生成
+      setSummarizing(true);
+      const sum = await summarizeDiscussion(settings, discussion, collected, ac.signal);
+      onUpdate(discussion.id, {
+        utterances: collected,
+        summary: sum.summary,
+        keyPoints: sum.keyPoints,
+        status: "done",
+      });
+    } catch (e) {
+      const err = e as { name?: string; message?: string };
+      if (err?.name !== "AbortError") {
+        setError(err?.message ?? String(e));
+      }
+      onUpdate(discussion.id, {
+        utterances: collected,
+        status: collected.length ? "done" : "draft",
+      });
+    } finally {
+      setRunning(false);
+      setSummarizing(false);
+      setStreaming(null);
+      abortRef.current = null;
+    }
+  };
+
+  const stop = () => abortRef.current?.abort();
+
+  const hasLog = utterances.length > 0;
 
   return (
     <section className="arena">
@@ -43,18 +92,25 @@ export function Arena({ discussion }: { discussion: Discussion }) {
         <a className="link" href="#/">
           ← 一覧へ
         </a>
-        <div className="seg" role="group" aria-label="接続先">
+        <div className="arena__tools">
+          <div className="seg" role="group" aria-label="接続先">
+            {(["mock", "local", "api"] as ProviderKind[]).map((k) => (
+              <button
+                key={k}
+                className={"seg__btn" + (settings.active === k ? " seg__btn--on" : "")}
+                onClick={() => setSettings({ ...settings, active: k })}
+                disabled={running}
+              >
+                {PROVIDER_LABEL[k]}
+              </button>
+            ))}
+          </div>
           <button
-            className={"seg__btn" + (provider === "local" ? " seg__btn--on" : "")}
-            onClick={() => setProvider("local")}
+            className="iconbtn"
+            title="接続設定"
+            onClick={() => setSettingsOpen(true)}
           >
-            ローカル
-          </button>
-          <button
-            className={"seg__btn" + (provider === "api" ? " seg__btn--on" : "")}
-            onClick={() => setProvider("api")}
-          >
-            API
+            ⚙
           </button>
         </div>
       </div>
@@ -70,36 +126,38 @@ export function Arena({ discussion }: { discussion: Discussion }) {
 
       <div className="arena__body">
         <div className="arena__chat">
-          {hasLog ? (
-            <Transcript
-              personas={personaById}
-              utterances={shown}
-              typingPersona={playing ? next : null}
-            />
-          ) : (
-            <div className="transcript transcript--empty">
-              <div className="transcript__empty">
-                <p>まだ発言がありません。</p>
-                <p className="muted">
-                  LLM 接続（次のステップ）を入れると、ここに議論が流れます。
-                </p>
-              </div>
-            </div>
-          )}
+          <Transcript
+            personas={personaById}
+            utterances={utterances}
+            streaming={streaming}
+          />
         </div>
       </div>
 
-      {hasLog && (
-        <Controls
-          playing={playing}
-          done={done}
-          atStart={revealed === 0}
-          onPlay={() => setPlaying((v) => !v)}
-          onStep={() => setRevealed((r) => Math.min(r + 1, utts.length))}
-          onReset={() => {
-            setPlaying(false);
-            setRevealed(0);
-          }}
+      {error && <div className="errbar">⚠ {error}</div>}
+
+      <div className="runbar">
+        {running ? (
+          <>
+            <button className="btn btn--danger" onClick={stop}>
+              ■ 停止
+            </button>
+            <span className="running-note">
+              {summarizing ? "要約を生成中…" : "議論を進行中…"}
+            </span>
+          </>
+        ) : (
+          <button className="btn btn--primary" onClick={start}>
+            {hasLog ? "↻ 再実行" : "▶ 議論を開始"}
+          </button>
+        )}
+      </div>
+
+      {settingsOpen && (
+        <SettingsModal
+          settings={settings}
+          onSave={setSettings}
+          onClose={() => setSettingsOpen(false)}
         />
       )}
     </section>

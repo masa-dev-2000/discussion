@@ -4,6 +4,7 @@ export interface Persona {
   title: string; // 一言の肩書き
   color: string; // アクセント色
   initial: string; // アバターの文字
+  prompt: string; // 人格・語り口(LLMのsystem prompt素材)
 }
 
 export interface Utterance {

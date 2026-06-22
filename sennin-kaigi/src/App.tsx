@@ -25,13 +25,18 @@ export default function App() {
     navigate(`/d/${id}`);
   };
 
+  const updateDiscussion = (id: string, patch: Partial<Discussion>) =>
+    setDiscussions((list) =>
+      list.map((d) => (d.id === id ? { ...d, ...patch } : d))
+    );
+
   let body;
   if (route.name === "setup") {
     body = <DiscussionSetup onCreate={createDiscussion} />;
   } else if (route.name === "arena") {
     const d = discussions.find((x) => x.id === route.id);
     body = d ? (
-      <Arena discussion={d} />
+      <Arena key={d.id} discussion={d} onUpdate={updateDiscussion} />
     ) : (
       <section className="page">
         <p className="muted">
