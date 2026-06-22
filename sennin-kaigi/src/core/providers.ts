@@ -13,6 +13,19 @@ export interface StreamOpts {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// Tauri 上では Rust 側の HTTP(CORS の制約を受けない)を使う。
+// ブラウザ(dev/プレビュー)では通常の fetch にフォールバック。
+async function httpFetch(
+  url: string,
+  init: RequestInit & { signal?: AbortSignal }
+): Promise<Response> {
+  if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+    const { fetch: tauriFetch } = await import("@tauri-apps/plugin-http");
+    return tauriFetch(url, init) as unknown as Response;
+  }
+  return fetch(url, init);
+}
+
 /**
  * OpenAI 互換の /chat/completions を SSE で叩き、本文デルタを順に yield する。
  * local(LM Studio / Ollama) と api(OpenAI 互換) はこの実装を共有。
@@ -29,7 +42,7 @@ export async function* streamChat(
     return;
   }
 
-  const res = await fetch(`${cfg.baseUrl.replace(/\/$/, "")}/chat/completions`, {
+  const res = await httpFetch(`${cfg.baseUrl.replace(/\/$/, "")}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
