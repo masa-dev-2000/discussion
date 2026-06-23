@@ -13,11 +13,12 @@ const isTauri = () =>
 
 // 進行中のまま閉じた議論は、読込時に整合させる
 function normalize(list: Discussion[]): Discussion[] {
-  return list.map((d) =>
-    d.status === "running"
-      ? { ...d, status: d.utterances.length ? "done" : "draft" }
-      : d
-  );
+  return list.map((d) => {
+    const mode = d.mode ?? "debate"; // 旧データは討論扱い
+    return d.status === "running"
+      ? { ...d, mode, status: d.utterances.length ? "done" : "draft" }
+      : { ...d, mode };
+  });
 }
 
 export async function loadDiscussions(): Promise<Discussion[]> {

@@ -3,6 +3,7 @@ import type { Discussion } from "../types";
 import { personaById } from "../data/personas";
 import { navigate } from "../router";
 import { useRuns } from "../core/runs";
+import { modeById } from "../data/modes";
 import { SummaryModal } from "../components/SummaryModal";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -46,6 +47,7 @@ export function DiscussionList({
                 <span className={`badge badge--${d.status}`}>
                   {STATUS_LABEL[d.status]}
                 </span>
+                <span className="modechip">{modeById[d.mode]?.label ?? "討論"}</span>
                 <span className="dcard__date">{d.createdAt}</span>
               </div>
               <h3 className="dcard__topic">{d.topic}</h3>

@@ -5,7 +5,11 @@ export interface Persona {
   color: string; // アクセント色
   initial: string; // アバターの文字
   prompt: string; // 人格・語り口(LLMのsystem prompt素材)
+  group?: "thinker" | "role"; // 思想家 / 発想ロール
 }
+
+// 論壇の進め方(アイデアエーション向けのモード)
+export type DiscussionMode = "diverge" | "critique" | "converge" | "debate";
 
 export interface Utterance {
   id: string;
@@ -20,6 +24,7 @@ export interface Discussion {
   id: string;
   topic: string; // テーマ
   goal: string; // ゴール
+  mode: DiscussionMode; // 進め方
   participantIds: string[]; // 対話者(司会を除く)
   rounds: number; // 想定ラウンド数
   status: DiscussionStatus;

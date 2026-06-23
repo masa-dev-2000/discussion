@@ -1,10 +1,13 @@
 import { useState } from "react";
+import type { DiscussionMode } from "../types";
 import { CATALOG } from "../data/personas";
+import { MODES } from "../data/modes";
 import { PersonaPicker } from "../components/PersonaPicker";
 
 export interface NewDiscussionInput {
   topic: string;
   goal: string;
+  mode: DiscussionMode;
   rounds: number;
   participantIds: string[];
 }
@@ -16,6 +19,7 @@ export function DiscussionSetup({
 }) {
   const [topic, setTopic] = useState("");
   const [goal, setGoal] = useState("");
+  const [mode, setMode] = useState<DiscussionMode>("diverge");
   const [rounds, setRounds] = useState(3);
   const [selected, setSelected] = useState<string[]>([]);
 
@@ -40,7 +44,7 @@ export function DiscussionSetup({
             className="field__input"
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
-            placeholder="例: 世界は本当に MECE に分類できるか?"
+            placeholder="例: 新しい家計簿アプリのアイデアを出したい"
           />
         </label>
 
@@ -50,10 +54,30 @@ export function DiscussionSetup({
             className="field__area"
             value={goal}
             onChange={(e) => setGoal(e.target.value)}
-            rows={3}
-            placeholder="この議論で何を明らかにしたいか"
+            rows={2}
+            placeholder="この討議で何を得たいか（例: 斬新な機能アイデアを10個）"
           />
         </label>
+
+        <div className="field">
+          <span className="field__label">進め方</span>
+          <div className="modes">
+            {MODES.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                className={"modecard" + (mode === m.id ? " modecard--on" : "")}
+                onClick={() => setMode(m.id)}
+              >
+                <span className="modecard__head">
+                  <span className="modecard__label">{m.label}</span>
+                  <span className="modecard__tag">{m.tagline}</span>
+                </span>
+                <span className="modecard__desc">{m.desc}</span>
+              </button>
+            ))}
+          </div>
+        </div>
 
         <label className="field field--inline">
           <span className="field__label">ラウンド数</span>
@@ -86,6 +110,7 @@ export function DiscussionSetup({
               onCreate({
                 topic: topic.trim(),
                 goal: goal.trim(),
+                mode,
                 rounds,
                 participantIds: selected,
               })

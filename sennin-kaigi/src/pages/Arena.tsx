@@ -6,6 +6,7 @@ import { ParticipantStrip } from "../components/ParticipantStrip";
 import { SettingsModal } from "../components/SettingsModal";
 import { ModelAssignModal } from "../components/ModelAssignModal";
 import { PROVIDER_LABEL, PROVIDER_KINDS, type Settings } from "../core/settings";
+import { modeById } from "../data/modes";
 import { useRuns } from "../core/runs";
 
 export function Arena({
@@ -96,7 +97,10 @@ export function Arena({
       </div>
 
       <div className="arena__topic">
-        <h2 className="arena__title">{discussion.topic}</h2>
+        <div className="arena__titlerow">
+          <h2 className="arena__title">{discussion.topic}</h2>
+          <span className="modechip">{modeById[discussion.mode]?.label ?? "討論"}</span>
+        </div>
         <p className="arena__goal">
           <span className="tag">ゴール</span>
           {discussion.goal || "（未設定）"}

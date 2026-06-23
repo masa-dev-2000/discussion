@@ -1,5 +1,6 @@
-import type { Discussion, Persona, Utterance } from "../types";
+import type { Discussion, DiscussionMode, Persona, Utterance } from "../types";
 import { MODERATOR, personaById } from "../data/personas";
+import { modeById } from "../data/modes";
 import { streamChat, type ChatMessage } from "./providers";
 import { resolveProvider, type Settings } from "./settings";
 
@@ -15,14 +16,28 @@ export interface RunOptions {
   addRounds?: number; // 追記時に足すラウンド数
 }
 
+// 進め方ごとの発言ルール
+function modeRule(mode: DiscussionMode): string {
+  switch (mode) {
+    case "diverge":
+      return "進め方=発散(ブレスト)。批評や実現性の判断はいったん保留せよ。直前の発言に『そうだ、さらに…』と乗っかって広げるか、別角度の新しいアイデアを出せ。発想の広さ・意外性を優先し、具体例を1つ添えよ。";
+    case "critique":
+      return "進め方=批判。これまでに出た案やアイデアの弱点・リスク・隠れた前提を具体的に突け。可能なら改善や代替も一言添えよ。";
+    case "converge":
+      return "進め方=収束。これまでに出た案を踏まえ、最も有望なものを理由とともに推すか、複数を統合して一つの強い案にまとめよ。";
+    case "debate":
+    default:
+      return "自分の立場から、直前の発言に具体的に反論または応答せよ。安易に同意せず、自分の核心は譲るな。";
+  }
+}
+
 function personaSystem(p: Persona, d: Discussion): string {
   return [
     `あなたは「${p.name}」(${p.title})です。${p.prompt}`,
-    `いま「先人会議」という討論の場にいる。`,
+    `いま「先人会議」というアイデア討議の場にいる。`,
     `議題: ${d.topic}`,
     d.goal ? `この会のゴール: ${d.goal}` : "",
-    `ルール: 日本語で3〜5文。自分の立場から、直前の発言に具体的に反論または応答せよ。`,
-    `安易に同意せず、少なくとも自分の核心は譲るな。前置きや自己紹介は不要、中身から話せ。`,
+    `ルール: 日本語で3〜5文。${modeRule(d.mode)}前置きや自己紹介は不要、中身から話せ。`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -30,10 +45,23 @@ function personaSystem(p: Persona, d: Discussion): string {
 
 function moderatorSystem(d: Discussion, phase: "open" | "close"): string {
   const base = `あなたは「司会」です。${MODERATOR.prompt}\n議題: ${d.topic}`;
+  const m = modeById[d.mode]?.label ?? "討論";
   if (phase === "open") {
-    return `${base}\nいまから討論を開く。議題を一言で示し、列席者に忌憚なく論じるよう促せ。2〜3文。`;
+    const how: Record<DiscussionMode, string> = {
+      diverge: "ブレストを始める。批評は後回し、まずは数多くのアイデアを出すよう促せ。",
+      critique: "批判の場を開く。各案の弱点やリスクを率直に出すよう促せ。",
+      converge: "収束の場を開く。出た案から有望なものを選び・束ねるよう促せ。",
+      debate: "討論を開く。各位に忌憚なく論じるよう促せ。",
+    };
+    return `${base}\n進め方: ${m}。${how[d.mode]} 議題を一言で示し、2〜3文で。`;
   }
-  return `${base}\nここまでの討論を踏まえ、対立点と一致点を一言で整理し、会を締めよ。2〜3文。`;
+  const close: Record<DiscussionMode, string> = {
+    diverge: "出たアイデアの要点と、次に深めるべき方向を一言で示し締めよ。",
+    critique: "主要なリスクと対処の方向を一言で整理し締めよ。",
+    converge: "選ばれた・束ねられた案を一言でまとめ締めよ。",
+    debate: "対立点と一致点を一言で整理し締めよ。",
+  };
+  return `${base}\n${close[d.mode]} 2〜3文で。`;
 }
 
 function buildUserMessage(p: Persona, transcript: Utterance[]): string {
@@ -152,14 +180,16 @@ export async function summarizeDiscussion(
     .map((u) => `【${personaById[u.personaId]?.name ?? "?"}】${u.text}`)
     .join("\n");
 
+  const m = modeById[discussion.mode] ?? modeById.debate;
+  const n = discussion.mode === "diverge" || discussion.mode === "converge" ? 8 : 6;
   const messages: ChatMessage[] = [
-    { role: "system", content: "あなたは討論の書記。立場に偏らず公平に要約する。" },
+    { role: "system", content: "あなたは討議の書記。立場に偏らず公平にまとめる。" },
     {
       role: "user",
       content:
-        `次の討論を要約せよ。\n議題: ${discussion.topic}\n\n${log}\n\n` +
+        `次の討議をまとめよ。\n議題: ${discussion.topic}\n進め方: ${m.label}\n\n${log}\n\n` +
         `出力は次の JSON のみ(前後に文章を付けない):\n` +
-        `{"summary":"150字程度の要約","keyPoints":["論点を最大5つ"]}`,
+        `{"summary":"全体の要約(120字程度)","keyPoints":["${m.pointLabel}を最大${n}個、簡潔に"]}`,
     },
   ];
 

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { Discussion } from "../types";
+import { modeById } from "../data/modes";
 
 export function SummaryModal({
   discussion,
@@ -31,11 +32,16 @@ export function SummaryModal({
           <>
             <p className="summary__text">{discussion.summary}</p>
             {discussion.keyPoints.length > 0 && (
-              <ul className="summary__points">
-                {discussion.keyPoints.map((k, i) => (
-                  <li key={i}>{k}</li>
-                ))}
-              </ul>
+              <>
+                <h4 className="summary__subhead">
+                  {modeById[discussion.mode]?.pointLabel ?? "論点"}
+                </h4>
+                <ul className="summary__points">
+                  {discussion.keyPoints.map((k, i) => (
+                    <li key={i}>{k}</li>
+                  ))}
+                </ul>
+              </>
             )}
           </>
         ) : (
