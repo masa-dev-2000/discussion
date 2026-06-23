@@ -45,6 +45,20 @@ npm run tauri build    # 配布用バイナリ(.app / .exe / .deb 等)
 
 Tauri 上では API 呼び出しが Rust 側 HTTP を経由するため、ブラウザの CORS 制約を受けません。
 
+### デスクトップからクリックで起動(Windows)
+
+```powershell
+npm run tauri build           # ビルド(初回は数分)
+npm run shortcut:win          # デスクトップにショートカットを作成
+```
+
+- ビルド後の実行ファイル: `src-tauri\target\release\先人会議.exe`(これを直接ダブルクリックでも起動)
+- インストーラ: `src-tauri\target\release\bundle\nsis\*-setup.exe` / `bundle\msi\*.msi`
+  （インストールするとスタートメニューに登録され、アイコンも付きます）
+- `npm run shortcut:win` はデスクトップに「先人会議」ショートカットを作成します（クリックで起動）
+
+> 実利用には別途 `ollama serve` を起動しておいてください（デモ接続なら不要）。
+
 ## LLM の接続(Ollama)
 
 論壇右上の ⚙(接続設定)で **デモ / Ollama** を切り替え。⚙ には **「接続テスト」** があり、
