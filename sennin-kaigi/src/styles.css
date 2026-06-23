@@ -196,6 +196,18 @@ a { color: inherit; text-decoration: none; }
 
 .arena__body { flex: 1; min-height: 0; display: flex; }
 .arena__chat { flex: 1; min-height: 0; display: flex; }
+.transcript-wrap { position: relative; flex: 1; min-height: 0; display: flex; }
+
+.jumpdown {
+  position: absolute; right: 18px; bottom: 16px; z-index: 5;
+  font-family: var(--sans); font-size: 12px; cursor: pointer;
+  padding: 7px 14px; border-radius: 999px;
+  color: var(--bg-0); border: 1px solid var(--gold);
+  background: linear-gradient(160deg, #e3c281, var(--gold));
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+.jumpdown:hover { filter: brightness(1.07); transform: translateY(-1px); }
 
 /* summary panel */
 .summary {
