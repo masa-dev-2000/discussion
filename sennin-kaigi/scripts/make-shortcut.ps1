@@ -1,4 +1,4 @@
-# 先人会議: ビルド済み実行ファイルへのショートカットを作成 (Windows)
+﻿# 先人会議: ビルド済み実行ファイルへのショートカットを作成 (Windows)
 #   - デスクトップ(ダブルクリック起動用)
 #   - スタートメニュー(Win キー検索で起動用)
 # 使い方:
@@ -10,8 +10,8 @@ $root = Split-Path -Parent $PSScriptRoot          # sennin-kaigi
 $rel = Join-Path $root "src-tauri\target\release"
 
 if (-not (Test-Path $rel)) {
-  Write-Host "release フォルダが見つかりません: $rel"
-  Write-Host "先に 'npm run tauri build' を実行してください。"
+  Write-Host "release folder not found: $rel"
+  Write-Host "Run 'npm run tauri build' first."
   exit 1
 }
 
@@ -25,7 +25,7 @@ if (-not $exe) {
   $exe = (Get-ChildItem -Path $rel -Filter *.exe -File | Select-Object -First 1).FullName
 }
 if (-not $exe) {
-  Write-Host "実行ファイル(.exe)が見つかりません。'npm run tauri build' が成功しているか確認してください。"
+  Write-Host "No .exe found. Make sure 'npm run tauri build' succeeded."
   exit 1
 }
 
@@ -35,12 +35,12 @@ function New-Shortcut($path) {
   $sc.TargetPath = $exe
   $sc.WorkingDirectory = Split-Path -Parent $exe
   $sc.IconLocation = $exe
-  $sc.Description = "先人会議 — アイデアエーション討議"
+  $sc.Description = "Sennin Kaigi"
   $sc.Save()
   Write-Host "  $path"
 }
 
-Write-Host "ショートカットを作成しました:"
+Write-Host "Created shortcuts:"
 
 # デスクトップ(ダブルクリック起動)
 $desktop = [Environment]::GetFolderPath("Desktop")
@@ -53,5 +53,4 @@ New-Shortcut (Join-Path $programs "先人会議.lnk")
 New-Shortcut (Join-Path $programs "Sennin Kaigi.lnk")
 
 Write-Host ""
-Write-Host "Win キーを押して「先人会議」または「sennin」で検索すると起動できます。"
-Write-Host "(検索に出るまで数十秒かかることがあります)"
+Write-Host "Press Win and search for the app to launch (it may take a moment to appear in search)."
