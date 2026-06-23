@@ -70,7 +70,21 @@ function buildUserMessage(p: Persona, transcript: Utterance[]): string {
         .map((u) => `【${personaById[u.personaId]?.name ?? "?"}】${u.text}`)
         .join("\n\n")
     : "（まだ誰も発言していない）";
-  return `これまでの発言:\n${log}\n\nあなた（${p.name}）の番だ。直前の流れを踏まえ、1ターン述べよ。`;
+
+  // 末尾に観察者(ユーザー)の割り込みがあれば、まずそれに応じさせる
+  const trailing: string[] = [];
+  for (let i = transcript.length - 1; i >= 0; i--) {
+    if (transcript[i].personaId === "observer") trailing.unshift(transcript[i].text);
+    else break;
+  }
+  const instruction =
+    trailing.length > 0
+      ? `観察者(議論を見ている第三者)から次の割り込みがあった:\n` +
+        trailing.map((t) => `「${t}」`).join("\n") +
+        `\nまずこの問いかけ・指摘に1〜2文で正面から応じ、それを踏まえて自分の発言を続けよ。`
+      : `あなた(${p.name})の番だ。直前の流れを踏まえ、1ターン述べよ。`;
+
+  return `これまでの発言:\n${log}\n\n${instruction}`;
 }
 
 /**
