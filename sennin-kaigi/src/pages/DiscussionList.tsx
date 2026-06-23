@@ -10,7 +10,13 @@ const STATUS_LABEL: Record<string, string> = {
   done: "完了",
 };
 
-export function DiscussionList({ discussions }: { discussions: Discussion[] }) {
+export function DiscussionList({
+  discussions,
+  onDelete,
+}: {
+  discussions: Discussion[];
+  onDelete: (id: string) => void;
+}) {
   const [openId, setOpenId] = useState<string | null>(null);
   const open = discussions.find((d) => d.id === openId) ?? null;
 
@@ -56,17 +62,29 @@ export function DiscussionList({ discussions }: { discussions: Discussion[] }) {
               <span className="dcard__meta">
                 {d.participantIds.length}名 ・ {d.rounds}ラウンド
               </span>
-              <button
-                className="btn btn--mini"
-                disabled={!d.summary}
-                title={d.summary ? "流れのまとめを見る" : "まだ要約はありません"}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setOpenId(d.id);
-                }}
-              >
-                要約
-              </button>
+              <div className="dcard__actions">
+                <button
+                  className="btn btn--mini"
+                  disabled={!d.summary}
+                  title={d.summary ? "流れのまとめを見る" : "まだ要約はありません"}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenId(d.id);
+                  }}
+                >
+                  要約
+                </button>
+                <button
+                  className="btn btn--mini btn--del"
+                  title="この議論を削除"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (confirm(`「${d.topic}」を削除しますか?`)) onDelete(d.id);
+                  }}
+                >
+                  削除
+                </button>
+              </div>
             </div>
           </li>
         ))}

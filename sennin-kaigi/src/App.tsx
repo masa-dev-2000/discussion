@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Discussion } from "./types";
-import { SEED_DISCUSSIONS } from "./data/discussions";
+import { loadDiscussions, saveDiscussions } from "./core/storage";
 import { useRoute, navigate } from "./router";
 import { DiscussionList } from "./pages/DiscussionList";
 import { DiscussionSetup, type NewDiscussionInput } from "./pages/DiscussionSetup";
@@ -8,7 +8,14 @@ import { Arena } from "./pages/Arena";
 
 export default function App() {
   const route = useRoute();
-  const [discussions, setDiscussions] = useState<Discussion[]>(SEED_DISCUSSIONS);
+  const [discussions, setDiscussions] = useState<Discussion[]>(() =>
+    loadDiscussions()
+  );
+
+  // 変更のたびに永続化
+  useEffect(() => {
+    saveDiscussions(discussions);
+  }, [discussions]);
 
   const createDiscussion = (input: NewDiscussionInput) => {
     const id = "d" + Date.now().toString(36);
@@ -30,6 +37,9 @@ export default function App() {
       list.map((d) => (d.id === id ? { ...d, ...patch } : d))
     );
 
+  const deleteDiscussion = (id: string) =>
+    setDiscussions((list) => list.filter((d) => d.id !== id));
+
   let body;
   if (route.name === "setup") {
     body = <DiscussionSetup onCreate={createDiscussion} />;
@@ -48,7 +58,9 @@ export default function App() {
       </section>
     );
   } else {
-    body = <DiscussionList discussions={discussions} />;
+    body = (
+      <DiscussionList discussions={discussions} onDelete={deleteDiscussion} />
+    );
   }
 
   return (
