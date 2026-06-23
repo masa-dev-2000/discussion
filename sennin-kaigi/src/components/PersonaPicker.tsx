@@ -37,27 +37,31 @@ export function PersonaPicker({
   selected: string[];
   onToggle: (id: string) => void;
 }) {
-  const roles = catalog.filter((p) => p.group === "role");
-  const thinkers = catalog.filter((p) => p.group !== "role");
+  const groups: { head: string; note?: string; items: Persona[] }[] = [
+    { head: "発想ロール", items: catalog.filter((p) => p.group === "role") },
+    {
+      head: "現代の実践者",
+      note: "公開された発言・姿勢に基づく作風の再現",
+      items: catalog.filter((p) => p.group === "modern"),
+    },
+    { head: "思想家", items: catalog.filter((p) => p.group === "thinker") },
+  ];
 
   return (
     <div className="picker-groups">
-      <div className="picker__group">
-        <span className="picker__grouphead">発想ロール</span>
-        <div className="picker">
-          {roles.map((p) => (
-            <Chip key={p.id} p={p} on={selected.includes(p.id)} onToggle={onToggle} />
-          ))}
+      {groups.map((g) => (
+        <div className="picker__group" key={g.head}>
+          <span className="picker__grouphead">
+            {g.head}
+            {g.note && <span className="picker__groupnote"> — {g.note}</span>}
+          </span>
+          <div className="picker">
+            {g.items.map((p) => (
+              <Chip key={p.id} p={p} on={selected.includes(p.id)} onToggle={onToggle} />
+            ))}
+          </div>
         </div>
-      </div>
-      <div className="picker__group">
-        <span className="picker__grouphead">思想家</span>
-        <div className="picker">
-          {thinkers.map((p) => (
-            <Chip key={p.id} p={p} on={selected.includes(p.id)} onToggle={onToggle} />
-          ))}
-        </div>
-      </div>
+      ))}
     </div>
   );
 }

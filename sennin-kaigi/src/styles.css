@@ -154,6 +154,7 @@ a { color: inherit; text-decoration: none; }
 .picker__grouphead {
   font-family: var(--serif); font-size: 12px; letter-spacing: 0.14em; color: var(--gold);
 }
+.picker__groupnote { font-family: var(--sans); font-size: 11px; letter-spacing: 0; color: var(--muted); }
 .picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
 .chip {
   display: flex; align-items: center; gap: 10px;

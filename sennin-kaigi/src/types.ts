@@ -5,7 +5,7 @@ export interface Persona {
   color: string; // アクセント色
   initial: string; // アバターの文字
   prompt: string; // 人格・語り口(LLMのsystem prompt素材)
-  group?: "thinker" | "role"; // 思想家 / 発想ロール
+  group?: "thinker" | "role" | "modern"; // 思想家 / 発想ロール / 現代の実践者
 }
 
 // 論壇の進め方(アイデアエーション向けのモード)
