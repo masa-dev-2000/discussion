@@ -88,6 +88,30 @@ export async function* streamChat(
   }
 }
 
+/**
+ * 接続先のモデル一覧を取得(OpenAI 互換 /models)。接続テストに使う。
+ */
+export async function listModels(
+  kind: ProviderKind,
+  cfg: ProviderConfig,
+  signal?: AbortSignal
+): Promise<string[]> {
+  if (kind === "mock") return ["demo-model"];
+  const res = await httpFetch(`${cfg.baseUrl.replace(/\/$/, "")}/models`, {
+    headers: cfg.apiKey ? { Authorization: `Bearer ${cfg.apiKey}` } : {},
+    signal,
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`HTTP ${res.status} ${detail.slice(0, 160)}`);
+  }
+  const json = await res.json();
+  const data = json?.data ?? [];
+  return Array.isArray(data)
+    ? data.map((m: { id?: unknown }) => String(m.id ?? "")).filter(Boolean)
+    : [];
+}
+
 /* ---------------- mock(デモ)プロバイダ ---------------- */
 
 const MOCK_LINES: Record<string, string[]> = {

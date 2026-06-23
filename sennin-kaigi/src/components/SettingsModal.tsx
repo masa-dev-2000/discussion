@@ -5,6 +5,13 @@ import {
   type ProviderKind,
   type Settings,
 } from "../core/settings";
+import { listModels } from "../core/providers";
+
+type TestState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "ok"; models: string[] }
+  | { status: "err"; error: string };
 
 export function SettingsModal({
   settings,
@@ -16,10 +23,67 @@ export function SettingsModal({
   onClose: () => void;
 }) {
   const [s, setS] = useState<Settings>(settings);
+  const [test, setTest] = useState<Record<"local" | "api", TestState>>({
+    local: { status: "idle" },
+    api: { status: "idle" },
+  });
+
   const setLocal = (patch: Partial<ProviderConfig>) =>
     setS({ ...s, local: { ...s.local, ...patch } });
   const setApi = (patch: Partial<ProviderConfig>) =>
     setS({ ...s, api: { ...s.api, ...patch } });
+
+  const runTest = async (which: "local" | "api") => {
+    setTest((t) => ({ ...t, [which]: { status: "loading" } }));
+    try {
+      const cfg = which === "api" ? s.api : s.local;
+      const models = await listModels(which, cfg);
+      setTest((t) => ({ ...t, [which]: { status: "ok", models } }));
+    } catch (e) {
+      const msg = (e as { message?: string })?.message ?? String(e);
+      setTest((t) => ({ ...t, [which]: { status: "err", error: msg } }));
+    }
+  };
+
+  const renderTest = (
+    which: "local" | "api",
+    apply: (model: string) => void
+  ) => {
+    const st = test[which];
+    return (
+      <div className="conntest">
+        <button
+          type="button"
+          className="btn btn--mini"
+          onClick={() => runTest(which)}
+          disabled={st.status === "loading"}
+        >
+          {st.status === "loading" ? "接続中…" : "接続テスト"}
+        </button>
+        {st.status === "ok" && (
+          <div className="conntest__ok">
+            ✓ 接続OK・{st.models.length} モデル
+            <div className="conntest__models">
+              {st.models.slice(0, 8).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  className="modeltag"
+                  title="このモデルを使う"
+                  onClick={() => apply(m)}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {st.status === "err" && (
+          <span className="conntest__err">✗ {st.error}</span>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="modal" onClick={onClose}>
@@ -55,6 +119,7 @@ export function SettingsModal({
                 className="field__input"
                 value={s.local.baseUrl}
                 onChange={(e) => setLocal({ baseUrl: e.target.value })}
+                placeholder="http://localhost:1234/v1"
               />
             </label>
             <label className="field">
@@ -65,6 +130,7 @@ export function SettingsModal({
                 onChange={(e) => setLocal({ model: e.target.value })}
               />
             </label>
+            {renderTest("local", (m) => setLocal({ model: m }))}
           </fieldset>
 
           <fieldset className="fieldset">
@@ -95,11 +161,13 @@ export function SettingsModal({
                 placeholder="sk-..."
               />
             </label>
+            {renderTest("api", (m) => setApi({ model: m }))}
           </fieldset>
 
           <p className="field__note">
-            「デモ」は LLM 不要でその場で動作確認できます。ブラウザからの API 直接呼び出しは
-            CORS で失敗する場合があります（Tauri 化で解消）。
+            ブラウザで「接続OK」にならない場合は、LM Studio の Server 設定で CORS
+            を有効にするか、デスクトップ版（Tauri）で起動してください（Tauri は CORS
+            の制約を受けません）。
           </p>
 
           <div className="form__actions">

@@ -47,10 +47,33 @@ Tauri 上では API 呼び出しが Rust 側 HTTP を経由するため、ブラ
 
 ## LLM の接続
 
-論壇右上の ⚙(接続設定)で切り替え。
+論壇右上の ⚙(接続設定)で切り替え。⚙ の各接続先には **「接続テスト」** があり、
+モデル一覧を取得して疎通を確認できます（取得したモデル名をクリックすると設定欄に入ります）。
 
 | 接続先 | 設定 |
 |---|---|
 | デモ | 設定不要。LLM なしで動作確認 |
 | ローカル | LM Studio / Ollama を起動し `http://localhost:1234/v1` 等を指定 |
 | API | OpenAI 互換のベース URL・モデル・API キーを指定 |
+
+### ローカル LLM に繋いで試す(LM Studio)
+
+1. LM Studio でモデルをロード（例: Qwen2.5 / Llama 3.1 系の instruct）
+2. 左の **Developer / Local Server** タブ → **Start Server**（既定で `http://localhost:1234`）
+3. アプリを起動（`npm run dev` または `npm run tauri dev`）
+4. 論壇の ⚙ → ローカルのベースURLが `http://localhost:1234/v1` であることを確認 →
+   **接続テスト** → モデル名が出れば OK。出たモデル名をクリックして「モデル」に設定
+5. 接続先トグルを **「ローカル」** にして **議論を開始**
+
+> **ブラウザ（`npm run dev`）で接続テストが失敗する場合**は CORS が原因です。
+> LM Studio の Server 設定で **CORS を有効化** するか、**`npm run tauri dev`(デスクトップ版)** で
+> 起動してください。Tauri 版は HTTP を Rust 側で行うため CORS の制約を受けません。
+
+### Ollama の場合
+
+```bash
+ollama serve            # 既定で http://localhost:11434
+ollama pull qwen2.5     # 使うモデルを取得
+```
+
+⚙ でローカルのベースURLを **`http://localhost:11434/v1`** に変更して接続テスト。
