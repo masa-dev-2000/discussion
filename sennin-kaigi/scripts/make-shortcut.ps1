@@ -1,4 +1,6 @@
-# 先人会議: ビルド済み実行ファイルへのデスクトップショートカットを作成 (Windows)
+# 先人会議: ビルド済み実行ファイルへのショートカットを作成 (Windows)
+#   - デスクトップ(ダブルクリック起動用)
+#   - スタートメニュー(Win キー検索で起動用)
 # 使い方:
 #   1) npm run tauri build
 #   2) powershell -ExecutionPolicy Bypass -File scripts\make-shortcut.ps1
@@ -27,17 +29,29 @@ if (-not $exe) {
   exit 1
 }
 
+function New-Shortcut($path) {
+  $ws = New-Object -ComObject WScript.Shell
+  $sc = $ws.CreateShortcut($path)
+  $sc.TargetPath = $exe
+  $sc.WorkingDirectory = Split-Path -Parent $exe
+  $sc.IconLocation = $exe
+  $sc.Description = "先人会議 — アイデアエーション討議"
+  $sc.Save()
+  Write-Host "  $path"
+}
+
+Write-Host "ショートカットを作成しました:"
+
+# デスクトップ(ダブルクリック起動)
 $desktop = [Environment]::GetFolderPath("Desktop")
-$lnk = Join-Path $desktop "先人会議.lnk"
+New-Shortcut (Join-Path $desktop "先人会議.lnk")
 
-$ws = New-Object -ComObject WScript.Shell
-$sc = $ws.CreateShortcut($lnk)
-$sc.TargetPath = $exe
-$sc.WorkingDirectory = Split-Path -Parent $exe
-$sc.IconLocation = $exe
-$sc.Description = "先人会議 — アイデアエーション討議"
-$sc.Save()
+# スタートメニュー(Win キー検索で起動)
+$programs = [Environment]::GetFolderPath("Programs")  # %APPDATA%\Microsoft\Windows\Start Menu\Programs
+New-Shortcut (Join-Path $programs "先人会議.lnk")
+# ローマ字でも検索できるよう別名も用意
+New-Shortcut (Join-Path $programs "Sennin Kaigi.lnk")
 
-Write-Host "デスクトップにショートカットを作成しました:"
-Write-Host "  $lnk"
-Write-Host "  -> $exe"
+Write-Host ""
+Write-Host "Win キーを押して「先人会議」または「sennin」で検索すると起動できます。"
+Write-Host "(検索に出るまで数十秒かかることがあります)"

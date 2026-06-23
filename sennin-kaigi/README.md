@@ -60,7 +60,10 @@ npm run shortcut:win          # デスクトップにショートカットを作
 - ビルド後の実行ファイル: `src-tauri\target\release\先人会議.exe`(これを直接ダブルクリックでも起動)
 - インストーラ: `src-tauri\target\release\bundle\nsis\*-setup.exe` / `bundle\msi\*.msi`
   （インストールするとスタートメニューに登録され、アイコンも付きます）
-- `npm run shortcut:win` はデスクトップに「先人会議」ショートカットを作成します（クリックで起動）
+- `npm run shortcut:win` はデスクトップとスタートメニューに「先人会議」ショートカットを作成します
+  - デスクトップ: ダブルクリックで起動
+  - スタートメニュー: **Win キー → 「先人会議」または「sennin」で検索 → 起動**（出るまで数十秒かかることあり）
+- もしくはインストーラ `bundle\nsis\*-setup.exe` でインストールすると、スタートメニュー登録・検索・アンインストールに対応します
 
 > 実利用には別途 `ollama serve` を起動しておいてください（デモ接続なら不要）。
 
