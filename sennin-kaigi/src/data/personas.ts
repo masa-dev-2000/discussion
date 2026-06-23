@@ -55,7 +55,17 @@ export const CATALOG: Persona[] = [
   },
 ];
 
-export const ALL_PERSONAS: Persona[] = [MODERATOR, ...CATALOG];
+// ユーザー本人(オブザーバ)。議論に口を挟むときの発言者。
+export const OBSERVER: Persona = {
+  id: "observer",
+  name: "あなた",
+  title: "観察者",
+  color: "#9bb0c4",
+  initial: "観",
+  prompt: "",
+};
+
+export const ALL_PERSONAS: Persona[] = [MODERATOR, OBSERVER, ...CATALOG];
 
 export const personaById: Record<string, Persona> = Object.fromEntries(
   ALL_PERSONAS.map((p) => [p.id, p])

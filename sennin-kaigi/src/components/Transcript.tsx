@@ -35,6 +35,7 @@ export function Transcript({
         const showRound = u.round !== lastRound;
         lastRound = u.round;
         const moderator = p.id === "moderator";
+        const observer = p.id === "observer";
         return (
           <div key={u.id}>
             {showRound && (
@@ -43,7 +44,11 @@ export function Transcript({
               </div>
             )}
             <div
-              className={"bubble" + (moderator ? " bubble--mod" : "")}
+              className={
+                "bubble" +
+                (moderator ? " bubble--mod" : "") +
+                (observer ? " bubble--observer" : "")
+              }
               style={{ ["--accent" as string]: p.color }}
             >
               {!moderator && (

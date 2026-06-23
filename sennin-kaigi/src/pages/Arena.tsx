@@ -22,6 +22,7 @@ export function Arena({
     errors,
     start,
     stop,
+    interject,
     canStart,
     checkHealth,
     health,
@@ -31,6 +32,7 @@ export function Arena({
   } = useRuns();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [draft, setDraft] = useState("");
 
   // 入室時に接続を確認
   useEffect(() => {
@@ -111,6 +113,33 @@ export function Arena({
           />
         </div>
       </div>
+
+      <form
+        className="interject"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const t = draft.trim();
+          if (!t) return;
+          interject(discussion.id, t);
+          setDraft("");
+        }}
+      >
+        <input
+          className="interject__input"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder={
+            running
+              ? "口を挟む…(次の発言の前に差し込まれます)"
+              : hasLog
+                ? "口を挟む…(『続きを1ラウンド』で先人が反応します)"
+                : "口を挟む…(観察者として記録)"
+          }
+        />
+        <button className="btn btn--ghost" type="submit" disabled={!draft.trim()}>
+          差し込む
+        </button>
+      </form>
 
       {error && <div className="errbar">⚠ {error}</div>}
       {providerDown && !running && (

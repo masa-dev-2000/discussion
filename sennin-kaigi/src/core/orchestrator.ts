@@ -7,6 +7,7 @@ export interface RunHandlers {
   onStart?: (persona: Persona, round: number) => void; // 発言開始(思案中)
   onToken?: (text: string) => void; // ストリームの1片
   onUtterance?: (u: Utterance) => void; // 1発言の確定
+  drainInjections?: () => string[]; // 溜まっている観察者の割り込みを取り出す
 }
 
 export interface RunOptions {
@@ -97,6 +98,21 @@ export async function runDiscussion(
     handlers.onUtterance?.(u);
   };
 
+  // 観察者(ユーザー)の割り込みを発言として挿入する
+  const flushObserver = (round: number) => {
+    const texts = handlers.drainInjections?.() ?? [];
+    for (const text of texts) {
+      const u: Utterance = {
+        id: `obs${stamp}-${uid++}`,
+        personaId: "observer",
+        round,
+        text,
+      };
+      transcript.push(u);
+      handlers.onUtterance?.(u);
+    }
+  };
+
   // 新規のときだけ開会の辞
   if (!isContinue) {
     await speak(MODERATOR, 1, moderatorSystem(discussion, "open"));
@@ -105,9 +121,11 @@ export async function runDiscussion(
   for (let i = 0; i < rounds; i++) {
     const r = startRound + i;
     for (const p of participants) {
+      flushObserver(r); // 次の登壇者の前に割り込みを差し込む
       await speak(p, r, personaSystem(p, discussion));
     }
   }
+  flushObserver(startRound + rounds - 1);
 
   // 新規のときだけ閉会の辞(追記時は二重に締めない)
   if (!isContinue) {

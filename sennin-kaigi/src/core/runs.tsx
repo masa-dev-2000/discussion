@@ -28,6 +28,7 @@ interface RunsContextValue {
   healthError: string;
   start: (id: string, mode: "fresh" | "continue") => void;
   stop: (id: string) => void;
+  interject: (id: string, text: string) => void;
   checkHealth: () => void;
   canStart: (id: string) => boolean;
 }
@@ -57,6 +58,7 @@ export function RunsProvider({
   const [healthError, setHealthError] = useState("");
 
   const aborts = useRef<Map<string, AbortController>>(new Map());
+  const pending = useRef<Map<string, string[]>>(new Map()); // 観察者の割り込み待ち
 
   // 最新値を非同期ループから参照するための ref
   const settingsRef = useRef(settings);
@@ -163,6 +165,11 @@ export function RunsProvider({
             patchRef.current(id, { utterances: [...collected] });
             setRuns((r) => (r[id] ? { ...r, [id]: { ...r[id], streaming: null } } : r));
           },
+          drainInjections: () => {
+            const q = pending.current.get(id) ?? [];
+            pending.current.set(id, []);
+            return q;
+          },
         },
         ac.signal,
         mode === "continue" ? { initialTranscript: seed, addRounds: 1 } : {}
@@ -213,6 +220,31 @@ export function RunsProvider({
     aborts.current.get(id)?.abort();
   }, []);
 
+  const interject = useCallback((id: string, text: string) => {
+    const t = text.trim();
+    if (!t) return;
+    if (runsRef.current[id]) {
+      // 実行中: 次の登壇者の前に差し込む
+      const q = pending.current.get(id) ?? [];
+      q.push(t);
+      pending.current.set(id, q);
+    } else {
+      // 停止中/完了後: 観察者コメントとして即座に記録
+      const d = getDiscRef.current(id);
+      if (!d) return;
+      const round = d.utterances.length
+        ? d.utterances[d.utterances.length - 1].round
+        : 1;
+      const u = {
+        id: `obs${Date.now().toString(36)}`,
+        personaId: "observer",
+        round,
+        text: t,
+      };
+      patchRef.current(id, { utterances: [...d.utterances, u] });
+    }
+  }, []);
+
   const value: RunsContextValue = {
     runs,
     errors,
@@ -222,6 +254,7 @@ export function RunsProvider({
     healthError,
     start,
     stop,
+    interject,
     checkHealth,
     canStart,
   };
