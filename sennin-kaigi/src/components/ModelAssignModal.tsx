@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { Persona } from "../types";
 import {
   PROVIDER_LABEL,
@@ -5,6 +6,7 @@ import {
   type ProviderKind,
   type Settings,
 } from "../core/settings";
+import { listModels } from "../core/providers";
 
 const KINDS = PROVIDER_KINDS;
 
@@ -19,13 +21,22 @@ export function ModelAssignModal({
   onSave: (s: Settings) => void;
   onClose: () => void;
 }) {
+  const [models, setModels] = useState<string[]>([]);
+
+  // インストール済みモデルを取得(候補として提示)
+  useEffect(() => {
+    listModels("ollama", settings.ollama)
+      .then(setModels)
+      .catch(() => setModels([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const setOverride = (
     personaId: string,
     patch: { kind?: ProviderKind | ""; model?: string }
   ) => {
     const next = { ...settings, overrides: { ...settings.overrides } };
     const cur = next.overrides[personaId];
-    // 「既定」を選んだら上書きを外す
     if (patch.kind === "") {
       delete next.overrides[personaId];
     } else {
@@ -48,6 +59,12 @@ export function ModelAssignModal({
         <p className="field__note" style={{ marginTop: 0 }}>
           人物ごとに接続先・モデルを上書きできます。「既定」のままなら全体設定に従います。
         </p>
+
+        <datalist id="assign-model-list">
+          {models.map((m) => (
+            <option key={m} value={m} />
+          ))}
+        </datalist>
 
         <div className="assign">
           {personas.map((p) => {
@@ -81,6 +98,7 @@ export function ModelAssignModal({
 
                 <input
                   className="assign__model"
+                  list="assign-model-list"
                   placeholder="モデル名(空=既定)"
                   value={ov?.model ?? ""}
                   disabled={!ov}
