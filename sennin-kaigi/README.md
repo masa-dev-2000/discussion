@@ -92,3 +92,25 @@ ollama pull llama3.2    # 使うモデルを取得(例: llama3.2 / qwen2.5 な�
 > **ブラウザ（`npm run dev`）で接続テストが失敗する場合**は CORS が原因です。
 > Ollama を `OLLAMA_ORIGINS=* ollama serve` で起動するか、**`npm run tauri dev`(デスクトップ版)** で
 > 起動してください。Tauri 版は HTTP を Rust 側で行うため CORS の制約を受けません。
+
+### うまく繋がらない時(HTTP 403 など)
+
+デスクトップ版でも `403` が出る場合は、Ollama 側の **Origin 制限**が原因です
+(Tauri からのリクエストには `tauri.localhost` という Origin が付き、既定の許可リストに無いため拒否されます。
+これはブラウザの CORS とは別の、Ollama サーバ自身のチェックです)。
+
+**Windows (PowerShell):**
+
+```powershell
+setx OLLAMA_ORIGINS "*"
+```
+
+その後、タスクトレイの Ollama を「Quit / 終了」→ スタートメニューから起動し直す（環境変数の再読込が必要）。
+`*` は全 Origin 許可。絞るなら
+`setx OLLAMA_ORIGINS "tauri://localhost,http://tauri.localhost,https://tauri.localhost,http://localhost"`。
+
+**macOS / Linux:**
+
+```bash
+OLLAMA_ORIGINS="*" ollama serve
+```
