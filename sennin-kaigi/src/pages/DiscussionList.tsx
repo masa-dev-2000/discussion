@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Discussion } from "../types";
 import { personaById } from "../data/personas";
 import { navigate } from "../router";
+import { useRuns } from "../core/runs";
 import { SummaryModal } from "../components/SummaryModal";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -19,14 +20,22 @@ export function DiscussionList({
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const open = discussions.find((d) => d.id === openId) ?? null;
+  const { runs, activeCount, maxConcurrent } = useRuns();
 
   return (
     <section className="page">
       <div className="page__head">
         <h2 className="page__title">議論一覧</h2>
-        <button className="btn btn--primary" onClick={() => navigate("/setup")}>
-          ＋ 新しい議論
-        </button>
+        <div className="page__head-right">
+          {activeCount > 0 && (
+            <span className="roundchip">
+              実行中 {activeCount} / {maxConcurrent}
+            </span>
+          )}
+          <button className="btn btn--primary" onClick={() => navigate("/setup")}>
+            ＋ 新しい議論
+          </button>
+        </div>
       </div>
 
       <ul className="dlist">

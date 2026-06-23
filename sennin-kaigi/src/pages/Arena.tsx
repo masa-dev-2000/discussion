@@ -1,93 +1,59 @@
-import { useRef, useState } from "react";
-import type { Discussion, Persona, Utterance } from "../types";
+import { useEffect, useState } from "react";
+import type { Discussion, Persona } from "../types";
 import { personaById, MODERATOR } from "../data/personas";
 import { Transcript, type StreamingState } from "../components/Transcript";
 import { ParticipantStrip } from "../components/ParticipantStrip";
 import { SettingsModal } from "../components/SettingsModal";
 import { ModelAssignModal } from "../components/ModelAssignModal";
-import { useSettings, PROVIDER_LABEL, PROVIDER_KINDS } from "../core/settings";
-import { runDiscussion, summarizeDiscussion } from "../core/orchestrator";
+import { PROVIDER_LABEL, PROVIDER_KINDS, type Settings } from "../core/settings";
+import { useRuns } from "../core/runs";
 
 export function Arena({
   discussion,
-  onUpdate,
+  settings,
+  setSettings,
 }: {
   discussion: Discussion;
-  onUpdate: (id: string, patch: Partial<Discussion>) => void;
+  settings: Settings;
+  setSettings: (s: Settings) => void;
 }) {
-  const [settings, setSettings] = useSettings();
-  const [utterances, setUtterances] = useState<Utterance[]>(discussion.utterances);
-  const [streaming, setStreaming] = useState<StreamingState | null>(null);
-  const [running, setRunning] = useState(false);
-  const [summarizing, setSummarizing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    runs,
+    errors,
+    start,
+    stop,
+    canStart,
+    checkHealth,
+    health,
+    healthError,
+    activeCount,
+    maxConcurrent,
+  } = useRuns();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
-  const abortRef = useRef<AbortController | null>(null);
+
+  // 入室時に接続を確認
+  useEffect(() => {
+    checkHealth();
+  }, [checkHealth]);
 
   const participants: Persona[] = [
     MODERATOR,
     ...discussion.participantIds.map((id) => personaById[id]).filter(Boolean),
   ];
 
-  const run = async (mode: "fresh" | "continue") => {
-    if (running) return;
-    setError(null);
-    const cont = mode === "continue";
-    const seed = cont ? utterances : [];
-    if (!cont) setUtterances([]);
-    setStreaming(null);
-    const ac = new AbortController();
-    abortRef.current = ac;
-    setRunning(true);
-    onUpdate(discussion.id, { status: "running" });
+  const run = runs[discussion.id];
+  const running = !!run;
+  const streaming: StreamingState | null =
+    run?.streaming && personaById[run.streaming.personaId]
+      ? { persona: personaById[run.streaming.personaId], text: run.streaming.text }
+      : null;
+  const error = errors[discussion.id];
+  const hasLog = discussion.utterances.length > 0;
 
-    const collected: Utterance[] = [...seed];
-    try {
-      await runDiscussion(
-        settings,
-        discussion,
-        {
-          onStart: (persona) => setStreaming({ persona, text: "" }),
-          onToken: (t) =>
-            setStreaming((s) => (s ? { ...s, text: s.text + t } : s)),
-          onUtterance: (u) => {
-            collected.push(u);
-            setUtterances((x) => [...x, u]);
-            setStreaming(null);
-          },
-        },
-        ac.signal,
-        cont ? { initialTranscript: seed, addRounds: 1 } : {}
-      );
-
-      // 要約生成(再開時はラウンド数も加算)
-      setSummarizing(true);
-      const sum = await summarizeDiscussion(settings, discussion, collected, ac.signal);
-      onUpdate(discussion.id, {
-        utterances: collected,
-        summary: sum.summary,
-        keyPoints: sum.keyPoints,
-        status: "done",
-        rounds: cont ? discussion.rounds + 1 : discussion.rounds,
-      });
-    } catch (e) {
-      const err = e as { name?: string; message?: string };
-      if (err?.name !== "AbortError") setError(err?.message ?? String(e));
-      onUpdate(discussion.id, {
-        utterances: collected,
-        status: collected.length ? "done" : "draft",
-      });
-    } finally {
-      setRunning(false);
-      setSummarizing(false);
-      setStreaming(null);
-      abortRef.current = null;
-    }
-  };
-
-  const stop = () => abortRef.current?.abort();
-  const hasLog = utterances.length > 0;
+  const providerDown = settings.active !== "mock" && health === "down";
+  const slotsFull = !running && activeCount >= maxConcurrent;
+  const startable = canStart(discussion.id);
 
   return (
     <section className="arena">
@@ -96,6 +62,11 @@ export function Arena({
           ← 一覧へ
         </a>
         <div className="arena__tools">
+          {activeCount > 0 && (
+            <span className="roundchip">
+              実行中 {activeCount} / {maxConcurrent}
+            </span>
+          )}
           <div className="seg" role="group" aria-label="接続先">
             {PROVIDER_KINDS.map((k) => (
               <button
@@ -135,33 +106,51 @@ export function Arena({
         <div className="arena__chat">
           <Transcript
             personas={personaById}
-            utterances={utterances}
+            utterances={discussion.utterances}
             streaming={streaming}
           />
         </div>
       </div>
 
       {error && <div className="errbar">⚠ {error}</div>}
+      {providerDown && !running && (
+        <div className="errbar">
+          ⚠ Ollama に接続できません{healthError ? `（${healthError}）` : ""}。⚙ で接続を確認するか、デモに切り替えてください。
+        </div>
+      )}
 
       <div className="runbar">
         {running ? (
           <>
-            <button className="btn btn--danger" onClick={stop}>
+            <button className="btn btn--danger" onClick={() => stop(discussion.id)}>
               ■ 停止
             </button>
             <span className="running-note">
-              {summarizing ? "要約を生成中…" : "議論を進行中…"}
+              {run.phase === "summarizing" ? "要約を生成中…" : "議論を進行中…"}
             </span>
           </>
         ) : (
           <>
-            <button className="btn btn--primary" onClick={() => run("fresh")}>
+            <button
+              className="btn btn--primary"
+              onClick={() => start(discussion.id, "fresh")}
+              disabled={!startable}
+            >
               {hasLog ? "↻ 再実行" : "▶ 議論を開始"}
             </button>
             {hasLog && (
-              <button className="btn btn--ghost" onClick={() => run("continue")}>
+              <button
+                className="btn btn--ghost"
+                onClick={() => start(discussion.id, "continue")}
+                disabled={!startable}
+              >
                 ↳ 続きを1ラウンド
               </button>
+            )}
+            {slotsFull && !providerDown && (
+              <span className="running-note">
+                実行枠が埋まっています（同時 {maxConcurrent} 件まで）
+              </span>
             )}
           </>
         )}
@@ -171,7 +160,10 @@ export function Arena({
         <SettingsModal
           settings={settings}
           onSave={setSettings}
-          onClose={() => setSettingsOpen(false)}
+          onClose={() => {
+            setSettingsOpen(false);
+            checkHealth();
+          }}
         />
       )}
       {assignOpen && (

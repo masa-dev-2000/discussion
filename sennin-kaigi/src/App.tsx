@@ -1,6 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Discussion } from "./types";
 import { loadDiscussions, saveDiscussions } from "./core/storage";
+import { useSettings } from "./core/settings";
+import { RunsProvider } from "./core/runs";
 import { useRoute, navigate } from "./router";
 import { DiscussionList } from "./pages/DiscussionList";
 import { DiscussionSetup, type NewDiscussionInput } from "./pages/DiscussionSetup";
@@ -8,8 +10,13 @@ import { Arena } from "./pages/Arena";
 
 export default function App() {
   const route = useRoute();
+  const [settings, setSettings] = useSettings();
   const [discussions, setDiscussions] = useState<Discussion[]>([]);
   const [loaded, setLoaded] = useState(false);
+
+  // 実行マネージャから最新の議論一覧を参照するための ref
+  const discussionsRef = useRef(discussions);
+  discussionsRef.current = discussions;
 
   // 起動時に復元
   useEffect(() => {
@@ -53,7 +60,7 @@ export default function App() {
   } else if (route.name === "arena") {
     const d = discussions.find((x) => x.id === route.id);
     body = d ? (
-      <Arena key={d.id} discussion={d} onUpdate={updateDiscussion} />
+      <Arena key={d.id} discussion={d} settings={settings} setSettings={setSettings} />
     ) : (
       <section className="page">
         <p className="muted">
@@ -71,17 +78,23 @@ export default function App() {
   }
 
   return (
-    <div className="app">
-      <header className="app__header">
-        <a className="app__brand" href="#/">
-          <span className="app__seal">會</span>
-          <div>
-            <h1 className="app__title">先人会議</h1>
-            <p className="app__sub">Council of the Ancients — 時を超えた知性の討論</p>
-          </div>
-        </a>
-      </header>
-      {body}
-    </div>
+    <RunsProvider
+      settings={settings}
+      getDiscussion={(id) => discussionsRef.current.find((d) => d.id === id)}
+      patchDiscussion={updateDiscussion}
+    >
+      <div className="app">
+        <header className="app__header">
+          <a className="app__brand" href="#/">
+            <span className="app__seal">會</span>
+            <div>
+              <h1 className="app__title">先人会議</h1>
+              <p className="app__sub">Council of the Ancients — 時を超えた知性の討論</p>
+            </div>
+          </a>
+        </header>
+        {body}
+      </div>
+    </RunsProvider>
   );
 }

@@ -61,6 +61,7 @@ a { color: inherit; text-decoration: none; }
   display: flex; flex-direction: column; gap: 18px;
 }
 .page__head { display: flex; align-items: center; justify-content: space-between; }
+.page__head-right { display: flex; align-items: center; gap: 12px; }
 .page__title { font-family: var(--serif); font-size: 20px; letter-spacing: 0.12em; margin: 0; }
 
 /* ---------- discussion list ---------- */

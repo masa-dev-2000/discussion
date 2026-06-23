@@ -19,6 +19,7 @@ export interface Settings {
   active: ProviderKind;
   ollama: ProviderConfig;
   overrides: Record<string, PersonaOverride>; // personaId -> 上書き
+  maxConcurrent: number; // 同時に進められる議論の上限
 }
 
 export const PROVIDER_LABEL: Record<ProviderKind, string> = {
@@ -32,6 +33,7 @@ const DEFAULTS: Settings = {
   active: "mock",
   ollama: { baseUrl: "http://localhost:11434/v1", model: "llama3.2", apiKey: "" },
   overrides: {},
+  maxConcurrent: 2,
 };
 
 const KEY = "sennin.settings";
@@ -71,6 +73,10 @@ export function loadSettings(): Settings {
         ...((parsed.ollama as Partial<ProviderConfig>) ?? {}),
       },
       overrides: normalizeOverrides(parsed.overrides),
+      maxConcurrent:
+        typeof parsed.maxConcurrent === "number"
+          ? parsed.maxConcurrent
+          : DEFAULTS.maxConcurrent,
     };
   } catch {
     return DEFAULTS;

@@ -73,6 +73,26 @@ export function SettingsModal({
             </div>
           </div>
 
+          <label className="field field--inline">
+            <span className="field__label">
+              同時実行数の上限{" "}
+              <span className="field__hint">（重さ対策。1〜4）</span>
+            </span>
+            <input
+              type="number"
+              min={1}
+              max={4}
+              className="field__num"
+              value={s.maxConcurrent}
+              onChange={(e) =>
+                setS({
+                  ...s,
+                  maxConcurrent: Math.max(1, Math.min(4, Number(e.target.value) || 1)),
+                })
+              }
+            />
+          </label>
+
           <fieldset className="fieldset">
             <legend>Ollama</legend>
             <label className="field">
