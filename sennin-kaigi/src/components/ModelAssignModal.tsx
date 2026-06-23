@@ -1,11 +1,12 @@
 import type { Persona } from "../types";
 import {
   PROVIDER_LABEL,
+  PROVIDER_KINDS,
   type ProviderKind,
   type Settings,
 } from "../core/settings";
 
-const KINDS: ProviderKind[] = ["mock", "local", "api"];
+const KINDS = PROVIDER_KINDS;
 
 export function ModelAssignModal({
   personas,

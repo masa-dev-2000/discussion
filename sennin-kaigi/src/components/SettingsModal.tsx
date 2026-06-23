@@ -1,8 +1,8 @@
 import { useState } from "react";
 import {
   PROVIDER_LABEL,
+  PROVIDER_KINDS,
   type ProviderConfig,
-  type ProviderKind,
   type Settings,
 } from "../core/settings";
 import { listModels } from "../core/providers";
@@ -23,66 +23,20 @@ export function SettingsModal({
   onClose: () => void;
 }) {
   const [s, setS] = useState<Settings>(settings);
-  const [test, setTest] = useState<Record<"local" | "api", TestState>>({
-    local: { status: "idle" },
-    api: { status: "idle" },
-  });
+  const [test, setTest] = useState<TestState>({ status: "idle" });
 
-  const setLocal = (patch: Partial<ProviderConfig>) =>
-    setS({ ...s, local: { ...s.local, ...patch } });
-  const setApi = (patch: Partial<ProviderConfig>) =>
-    setS({ ...s, api: { ...s.api, ...patch } });
+  const setOllama = (patch: Partial<ProviderConfig>) =>
+    setS({ ...s, ollama: { ...s.ollama, ...patch } });
 
-  const runTest = async (which: "local" | "api") => {
-    setTest((t) => ({ ...t, [which]: { status: "loading" } }));
+  const runTest = async () => {
+    setTest({ status: "loading" });
     try {
-      const cfg = which === "api" ? s.api : s.local;
-      const models = await listModels(which, cfg);
-      setTest((t) => ({ ...t, [which]: { status: "ok", models } }));
+      const models = await listModels("ollama", s.ollama);
+      setTest({ status: "ok", models });
     } catch (e) {
       const msg = (e as { message?: string })?.message ?? String(e);
-      setTest((t) => ({ ...t, [which]: { status: "err", error: msg } }));
+      setTest({ status: "err", error: msg });
     }
-  };
-
-  const renderTest = (
-    which: "local" | "api",
-    apply: (model: string) => void
-  ) => {
-    const st = test[which];
-    return (
-      <div className="conntest">
-        <button
-          type="button"
-          className="btn btn--mini"
-          onClick={() => runTest(which)}
-          disabled={st.status === "loading"}
-        >
-          {st.status === "loading" ? "接続中…" : "接続テスト"}
-        </button>
-        {st.status === "ok" && (
-          <div className="conntest__ok">
-            ✓ 接続OK・{st.models.length} モデル
-            <div className="conntest__models">
-              {st.models.slice(0, 8).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  className="modeltag"
-                  title="このモデルを使う"
-                  onClick={() => apply(m)}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        {st.status === "err" && (
-          <span className="conntest__err">✗ {st.error}</span>
-        )}
-      </div>
-    );
   };
 
   return (
@@ -99,7 +53,7 @@ export function SettingsModal({
           <div className="field">
             <span className="field__label">使用する接続先</span>
             <div className="seg seg--wide">
-              {(["mock", "local", "api"] as ProviderKind[]).map((k) => (
+              {PROVIDER_KINDS.map((k) => (
                 <button
                   key={k}
                   className={"seg__btn" + (s.active === k ? " seg__btn--on" : "")}
@@ -112,62 +66,63 @@ export function SettingsModal({
           </div>
 
           <fieldset className="fieldset">
-            <legend>ローカル (LM Studio / Ollama)</legend>
+            <legend>Ollama</legend>
             <label className="field">
               <span className="field__label">ベースURL</span>
               <input
                 className="field__input"
-                value={s.local.baseUrl}
-                onChange={(e) => setLocal({ baseUrl: e.target.value })}
-                placeholder="http://localhost:1234/v1"
+                value={s.ollama.baseUrl}
+                onChange={(e) => setOllama({ baseUrl: e.target.value })}
+                placeholder="http://localhost:11434/v1"
               />
             </label>
             <label className="field">
               <span className="field__label">モデル</span>
               <input
                 className="field__input"
-                value={s.local.model}
-                onChange={(e) => setLocal({ model: e.target.value })}
+                value={s.ollama.model}
+                onChange={(e) => setOllama({ model: e.target.value })}
+                placeholder="llama3.2"
               />
             </label>
-            {renderTest("local", (m) => setLocal({ model: m }))}
-          </fieldset>
 
-          <fieldset className="fieldset">
-            <legend>API (OpenAI 互換)</legend>
-            <label className="field">
-              <span className="field__label">ベースURL</span>
-              <input
-                className="field__input"
-                value={s.api.baseUrl}
-                onChange={(e) => setApi({ baseUrl: e.target.value })}
-              />
-            </label>
-            <label className="field">
-              <span className="field__label">モデル</span>
-              <input
-                className="field__input"
-                value={s.api.model}
-                onChange={(e) => setApi({ model: e.target.value })}
-              />
-            </label>
-            <label className="field">
-              <span className="field__label">APIキー</span>
-              <input
-                className="field__input"
-                type="password"
-                value={s.api.apiKey}
-                onChange={(e) => setApi({ apiKey: e.target.value })}
-                placeholder="sk-..."
-              />
-            </label>
-            {renderTest("api", (m) => setApi({ model: m }))}
+            <div className="conntest">
+              <button
+                type="button"
+                className="btn btn--mini"
+                onClick={runTest}
+                disabled={test.status === "loading"}
+              >
+                {test.status === "loading" ? "接続中…" : "接続テスト"}
+              </button>
+              {test.status === "ok" && (
+                <div className="conntest__ok">
+                  ✓ 接続OK・{test.models.length} モデル
+                  <div className="conntest__models">
+                    {test.models.slice(0, 12).map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        className="modeltag"
+                        title="このモデルを使う"
+                        onClick={() => setOllama({ model: m })}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {test.status === "err" && (
+                <span className="conntest__err">✗ {test.error}</span>
+              )}
+            </div>
           </fieldset>
 
           <p className="field__note">
-            ブラウザで「接続OK」にならない場合は、LM Studio の Server 設定で CORS
-            を有効にするか、デスクトップ版（Tauri）で起動してください（Tauri は CORS
-            の制約を受けません）。
+            Ollama は <code>ollama serve</code> で起動（既定 <code>http://localhost:11434</code>）。
+            ブラウザで接続テストが失敗する場合は <code>OLLAMA_ORIGINS=*</code> を設定するか、
+            デスクトップ版（Tauri）で起動してください（Tauri は CORS の制約を受けません）。
           </p>
 
           <div className="form__actions">

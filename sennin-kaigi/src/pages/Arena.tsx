@@ -5,7 +5,7 @@ import { Transcript, type StreamingState } from "../components/Transcript";
 import { ParticipantStrip } from "../components/ParticipantStrip";
 import { SettingsModal } from "../components/SettingsModal";
 import { ModelAssignModal } from "../components/ModelAssignModal";
-import { useSettings, PROVIDER_LABEL, type ProviderKind } from "../core/settings";
+import { useSettings, PROVIDER_LABEL, PROVIDER_KINDS } from "../core/settings";
 import { runDiscussion, summarizeDiscussion } from "../core/orchestrator";
 
 export function Arena({
@@ -97,7 +97,7 @@ export function Arena({
         </a>
         <div className="arena__tools">
           <div className="seg" role="group" aria-label="接続先">
-            {(["mock", "local", "api"] as ProviderKind[]).map((k) => (
+            {PROVIDER_KINDS.map((k) => (
               <button
                 key={k}
                 className={"seg__btn" + (settings.active === k ? " seg__btn--on" : "")}

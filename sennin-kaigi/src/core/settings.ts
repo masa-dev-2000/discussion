@@ -1,11 +1,12 @@
 import { useState } from "react";
 
-export type ProviderKind = "mock" | "local" | "api";
+// 接続先は「デモ」と「Ollama」の2択
+export type ProviderKind = "mock" | "ollama";
 
 export interface ProviderConfig {
   baseUrl: string; // OpenAI 互換のベース (…/v1)
   model: string;
-  apiKey: string;
+  apiKey: string; // Ollama では未使用(将来の互換のため保持)
 }
 
 // 人物ごとのモデル上書き(任意)。司会だけ賢いモデルにする等。
@@ -16,31 +17,61 @@ export interface PersonaOverride {
 
 export interface Settings {
   active: ProviderKind;
-  local: ProviderConfig;
-  api: ProviderConfig;
+  ollama: ProviderConfig;
   overrides: Record<string, PersonaOverride>; // personaId -> 上書き
 }
 
 export const PROVIDER_LABEL: Record<ProviderKind, string> = {
   mock: "デモ",
-  local: "ローカル",
-  api: "API",
+  ollama: "Ollama",
 };
+
+export const PROVIDER_KINDS: ProviderKind[] = ["mock", "ollama"];
 
 const DEFAULTS: Settings = {
   active: "mock",
-  local: { baseUrl: "http://localhost:1234/v1", model: "local-model", apiKey: "" },
-  api: { baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini", apiKey: "" },
+  ollama: { baseUrl: "http://localhost:11434/v1", model: "llama3.2", apiKey: "" },
   overrides: {},
 };
 
 const KEY = "sennin.settings";
 
+function normalizeKind(k: unknown): ProviderKind {
+  return k === "mock" ? "mock" : "ollama";
+}
+
+function normalizeOverrides(
+  raw: unknown
+): Record<string, PersonaOverride> {
+  const out: Record<string, PersonaOverride> = {};
+  if (raw && typeof raw === "object") {
+    for (const [id, v] of Object.entries(raw as Record<string, unknown>)) {
+      const ov = v as { kind?: unknown; model?: unknown };
+      out[id] = { kind: normalizeKind(ov.kind), model: String(ov.model ?? "") };
+    }
+  }
+  return out;
+}
+
 export function loadSettings(): Settings {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return DEFAULTS;
-    return { ...DEFAULTS, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    // 旧バージョン(local/api)からの移行も兼ねる
+    return {
+      active:
+        parsed.active === "mock" || parsed.active === "ollama"
+          ? (parsed.active as ProviderKind)
+          : parsed.active
+            ? "ollama"
+            : DEFAULTS.active,
+      ollama: {
+        ...DEFAULTS.ollama,
+        ...((parsed.ollama as Partial<ProviderConfig>) ?? {}),
+      },
+      overrides: normalizeOverrides(parsed.overrides),
+    };
   } catch {
     return DEFAULTS;
   }
@@ -63,10 +94,6 @@ export function useSettings(): [Settings, (s: Settings) => void] {
   return [s, update];
 }
 
-export function activeConfig(s: Settings): ProviderConfig {
-  return s.active === "api" ? s.api : s.local;
-}
-
 export interface Resolved {
   kind: ProviderKind;
   cfg: ProviderConfig;
@@ -76,7 +103,6 @@ export interface Resolved {
 export function resolveProvider(s: Settings, personaId: string): Resolved {
   const ov = s.overrides?.[personaId];
   const kind = ov?.kind ?? s.active;
-  const base = kind === "api" ? s.api : s.local;
-  const cfg = ov?.model ? { ...base, model: ov.model } : base;
+  const cfg = ov?.model ? { ...s.ollama, model: ov.model } : s.ollama;
   return { kind, cfg };
 }
