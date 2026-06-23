@@ -1,0 +1,100 @@
+import { useEffect, useRef, useState } from "react";
+import type { Discussion } from "./types";
+import { loadDiscussions, saveDiscussions } from "./core/storage";
+import { useSettings } from "./core/settings";
+import { RunsProvider } from "./core/runs";
+import { useRoute, navigate } from "./router";
+import { DiscussionList } from "./pages/DiscussionList";
+import { DiscussionSetup, type NewDiscussionInput } from "./pages/DiscussionSetup";
+import { Arena } from "./pages/Arena";
+
+export default function App() {
+  const route = useRoute();
+  const [settings, setSettings] = useSettings();
+  const [discussions, setDiscussions] = useState<Discussion[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  // 実行マネージャから最新の議論一覧を参照するための ref
+  const discussionsRef = useRef(discussions);
+  discussionsRef.current = discussions;
+
+  // 起動時に復元
+  useEffect(() => {
+    loadDiscussions().then((list) => {
+      setDiscussions(list);
+      setLoaded(true);
+    });
+  }, []);
+
+  // 変更のたびに永続化(初回ロード完了後のみ)
+  useEffect(() => {
+    if (loaded) saveDiscussions(discussions);
+  }, [discussions, loaded]);
+
+  const createDiscussion = (input: NewDiscussionInput) => {
+    const id = "d" + Date.now().toString(36);
+    const d: Discussion = {
+      id,
+      ...input,
+      status: "draft",
+      createdAt: new Date().toISOString().slice(0, 10),
+      utterances: [],
+      summary: "",
+      keyPoints: [],
+    };
+    setDiscussions((list) => [d, ...list]);
+    navigate(`/d/${id}`);
+  };
+
+  const updateDiscussion = (id: string, patch: Partial<Discussion>) =>
+    setDiscussions((list) =>
+      list.map((d) => (d.id === id ? { ...d, ...patch } : d))
+    );
+
+  const deleteDiscussion = (id: string) =>
+    setDiscussions((list) => list.filter((d) => d.id !== id));
+
+  let body;
+  if (route.name === "setup") {
+    body = <DiscussionSetup onCreate={createDiscussion} />;
+  } else if (route.name === "arena") {
+    const d = discussions.find((x) => x.id === route.id);
+    body = d ? (
+      <Arena key={d.id} discussion={d} settings={settings} setSettings={setSettings} />
+    ) : (
+      <section className="page">
+        <p className="muted">
+          議論が見つかりません。{" "}
+          <a className="link" href="#/">
+            一覧へ
+          </a>
+        </p>
+      </section>
+    );
+  } else {
+    body = (
+      <DiscussionList discussions={discussions} onDelete={deleteDiscussion} />
+    );
+  }
+
+  return (
+    <RunsProvider
+      settings={settings}
+      getDiscussion={(id) => discussionsRef.current.find((d) => d.id === id)}
+      patchDiscussion={updateDiscussion}
+    >
+      <div className="app">
+        <header className="app__header">
+          <a className="app__brand" href="#/">
+            <span className="app__seal">會</span>
+            <div>
+              <h1 className="app__title">先人会議</h1>
+              <p className="app__sub">Council of the Ancients — 時を超えた知性の討論</p>
+            </div>
+          </a>
+        </header>
+        {body}
+      </div>
+    </RunsProvider>
+  );
+}
