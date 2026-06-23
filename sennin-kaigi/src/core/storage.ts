@@ -1,10 +1,17 @@
 import type { Discussion } from "../types";
 import { SEED_DISCUSSIONS } from "../data/discussions";
 
-// 議論の永続化。localStorage を使う(Tauri の webview でもディスクに永続化される)。
-const KEY = "sennin.discussions";
+// 議論の永続化。
+// - Tauri: Store プラグインでアプリのデータディレクトリに JSON ファイル保存
+// - ブラウザ: localStorage
+const FILE = "discussions.json";
+const STORE_KEY = "discussions";
+const LS_KEY = "sennin.discussions";
 
-// 進行中のまま閉じた議論は、再読込時に整合させる
+const isTauri = () =>
+  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
+// 進行中のまま閉じた議論は、読込時に整合させる
 function normalize(list: Discussion[]): Discussion[] {
   return list.map((d) =>
     d.status === "running"
@@ -13,21 +20,33 @@ function normalize(list: Discussion[]): Discussion[] {
   );
 }
 
-export function loadDiscussions(): Discussion[] {
+export async function loadDiscussions(): Promise<Discussion[]> {
   try {
-    const raw = localStorage.getItem(KEY);
-    if (raw === null) return SEED_DISCUSSIONS; // 初回はシードを表示
+    if (isTauri()) {
+      const { load } = await import("@tauri-apps/plugin-store");
+      const store = await load(FILE, { defaults: {}, autoSave: false });
+      const v = await store.get<Discussion[]>(STORE_KEY);
+      return v && Array.isArray(v) ? normalize(v) : SEED_DISCUSSIONS;
+    }
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw === null) return SEED_DISCUSSIONS; // 初回はシード
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return SEED_DISCUSSIONS;
-    return normalize(parsed as Discussion[]);
+    return Array.isArray(parsed) ? normalize(parsed) : SEED_DISCUSSIONS;
   } catch {
     return SEED_DISCUSSIONS;
   }
 }
 
-export function saveDiscussions(list: Discussion[]) {
+export async function saveDiscussions(list: Discussion[]): Promise<void> {
   try {
-    localStorage.setItem(KEY, JSON.stringify(list));
+    if (isTauri()) {
+      const { load } = await import("@tauri-apps/plugin-store");
+      const store = await load(FILE, { defaults: {}, autoSave: false });
+      await store.set(STORE_KEY, list);
+      await store.save();
+      return;
+    }
+    localStorage.setItem(LS_KEY, JSON.stringify(list));
   } catch {
     /* 容量超過などは無視 */
   }

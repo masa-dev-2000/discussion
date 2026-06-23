@@ -4,6 +4,7 @@ import { personaById, MODERATOR } from "../data/personas";
 import { Transcript, type StreamingState } from "../components/Transcript";
 import { ParticipantStrip } from "../components/ParticipantStrip";
 import { SettingsModal } from "../components/SettingsModal";
+import { ModelAssignModal } from "../components/ModelAssignModal";
 import { useSettings, PROVIDER_LABEL, type ProviderKind } from "../core/settings";
 import { runDiscussion, summarizeDiscussion } from "../core/orchestrator";
 
@@ -21,6 +22,7 @@ export function Arena({
   const [summarizing, setSummarizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   const participants: Persona[] = [
@@ -28,17 +30,19 @@ export function Arena({
     ...discussion.participantIds.map((id) => personaById[id]).filter(Boolean),
   ];
 
-  const start = async () => {
+  const run = async (mode: "fresh" | "continue") => {
     if (running) return;
     setError(null);
-    setUtterances([]);
+    const cont = mode === "continue";
+    const seed = cont ? utterances : [];
+    if (!cont) setUtterances([]);
     setStreaming(null);
     const ac = new AbortController();
     abortRef.current = ac;
     setRunning(true);
     onUpdate(discussion.id, { status: "running" });
 
-    const collected: Utterance[] = [];
+    const collected: Utterance[] = [...seed];
     try {
       await runDiscussion(
         settings,
@@ -53,10 +57,11 @@ export function Arena({
             setStreaming(null);
           },
         },
-        ac.signal
+        ac.signal,
+        cont ? { initialTranscript: seed, addRounds: 1 } : {}
       );
 
-      // B: 要約生成
+      // 要約生成(再開時はラウンド数も加算)
       setSummarizing(true);
       const sum = await summarizeDiscussion(settings, discussion, collected, ac.signal);
       onUpdate(discussion.id, {
@@ -64,12 +69,11 @@ export function Arena({
         summary: sum.summary,
         keyPoints: sum.keyPoints,
         status: "done",
+        rounds: cont ? discussion.rounds + 1 : discussion.rounds,
       });
     } catch (e) {
       const err = e as { name?: string; message?: string };
-      if (err?.name !== "AbortError") {
-        setError(err?.message ?? String(e));
-      }
+      if (err?.name !== "AbortError") setError(err?.message ?? String(e));
       onUpdate(discussion.id, {
         utterances: collected,
         status: collected.length ? "done" : "draft",
@@ -83,7 +87,6 @@ export function Arena({
   };
 
   const stop = () => abortRef.current?.abort();
-
   const hasLog = utterances.length > 0;
 
   return (
@@ -107,9 +110,13 @@ export function Arena({
           </div>
           <button
             className="iconbtn"
-            title="接続設定"
-            onClick={() => setSettingsOpen(true)}
+            title="モデル割当(人物ごと)"
+            onClick={() => setAssignOpen(true)}
+            disabled={running}
           >
+            ⚖
+          </button>
+          <button className="iconbtn" title="接続設定" onClick={() => setSettingsOpen(true)}>
             ⚙
           </button>
         </div>
@@ -147,9 +154,16 @@ export function Arena({
             </span>
           </>
         ) : (
-          <button className="btn btn--primary" onClick={start}>
-            {hasLog ? "↻ 再実行" : "▶ 議論を開始"}
-          </button>
+          <>
+            <button className="btn btn--primary" onClick={() => run("fresh")}>
+              {hasLog ? "↻ 再実行" : "▶ 議論を開始"}
+            </button>
+            {hasLog && (
+              <button className="btn btn--ghost" onClick={() => run("continue")}>
+                ↳ 続きを1ラウンド
+              </button>
+            )}
+          </>
         )}
       </div>
 
@@ -158,6 +172,14 @@ export function Arena({
           settings={settings}
           onSave={setSettings}
           onClose={() => setSettingsOpen(false)}
+        />
+      )}
+      {assignOpen && (
+        <ModelAssignModal
+          personas={participants}
+          settings={settings}
+          onSave={setSettings}
+          onClose={() => setAssignOpen(false)}
         />
       )}
     </section>

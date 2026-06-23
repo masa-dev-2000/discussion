@@ -8,14 +8,21 @@ import { Arena } from "./pages/Arena";
 
 export default function App() {
   const route = useRoute();
-  const [discussions, setDiscussions] = useState<Discussion[]>(() =>
-    loadDiscussions()
-  );
+  const [discussions, setDiscussions] = useState<Discussion[]>([]);
+  const [loaded, setLoaded] = useState(false);
 
-  // 変更のたびに永続化
+  // 起動時に復元
   useEffect(() => {
-    saveDiscussions(discussions);
-  }, [discussions]);
+    loadDiscussions().then((list) => {
+      setDiscussions(list);
+      setLoaded(true);
+    });
+  }, []);
+
+  // 変更のたびに永続化(初回ロード完了後のみ)
+  useEffect(() => {
+    if (loaded) saveDiscussions(discussions);
+  }, [discussions, loaded]);
 
   const createDiscussion = (input: NewDiscussionInput) => {
     const id = "d" + Date.now().toString(36);

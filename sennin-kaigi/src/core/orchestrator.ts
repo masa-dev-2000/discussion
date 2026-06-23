@@ -1,12 +1,17 @@
 import type { Discussion, Persona, Utterance } from "../types";
 import { MODERATOR, personaById } from "../data/personas";
 import { streamChat, type ChatMessage } from "./providers";
-import { activeConfig, type Settings } from "./settings";
+import { resolveProvider, type Settings } from "./settings";
 
 export interface RunHandlers {
   onStart?: (persona: Persona, round: number) => void; // 発言開始(思案中)
   onToken?: (text: string) => void; // ストリームの1片
   onUtterance?: (u: Utterance) => void; // 1発言の確定
+}
+
+export interface RunOptions {
+  initialTranscript?: Utterance[]; // 既存ログから続ける(再開・追記)
+  addRounds?: number; // 追記時に足すラウンド数
 }
 
 function personaSystem(p: Persona, d: Discussion): string {
@@ -41,26 +46,35 @@ function buildUserMessage(p: Persona, transcript: Utterance[]): string {
 
 /**
  * 会議を実行。各発言をストリームしながら handlers に通知する。
+ * 人物ごとに接続先(モデル)を解決する。
  * abort された場合は AbortError が投げられる(呼び出し側で握る)。
  */
 export async function runDiscussion(
   settings: Settings,
   discussion: Discussion,
   handlers: RunHandlers,
-  signal: AbortSignal
+  signal: AbortSignal,
+  opts: RunOptions = {}
 ): Promise<Utterance[]> {
-  const kind = settings.active;
-  const cfg = activeConfig(settings);
   const participants = discussion.participantIds
     .map((id) => personaById[id])
     .filter(Boolean) as Persona[];
 
-  const transcript: Utterance[] = [];
+  const seed = opts.initialTranscript ?? [];
+  const isContinue = seed.length > 0;
+  const transcript: Utterance[] = [...seed];
+  const stamp = Date.now().toString(36);
   let uid = 0;
+
+  const startRound = isContinue
+    ? Math.max(...seed.map((u) => u.round)) + 1
+    : 1;
+  const rounds = opts.addRounds ?? discussion.rounds;
 
   const speak = async (persona: Persona, round: number, system: string) => {
     if (signal.aborted) throw new DOMException("aborted", "AbortError");
     handlers.onStart?.(persona, round);
+    const { kind, cfg } = resolveProvider(settings, persona.id);
     const messages: ChatMessage[] = [
       { role: "system", content: system },
       { role: "user", content: buildUserMessage(persona, transcript) },
@@ -73,23 +87,32 @@ export async function runDiscussion(
       acc += tok;
       handlers.onToken?.(tok);
     }
-    const u: Utterance = { id: `g${uid++}`, personaId: persona.id, round, text: acc.trim() };
+    const u: Utterance = {
+      id: `g${stamp}-${uid++}`,
+      personaId: persona.id,
+      round,
+      text: acc.trim(),
+    };
     transcript.push(u);
     handlers.onUtterance?.(u);
   };
 
-  // 開会
-  await speak(MODERATOR, 1, moderatorSystem(discussion, "open"));
+  // 新規のときだけ開会の辞
+  if (!isContinue) {
+    await speak(MODERATOR, 1, moderatorSystem(discussion, "open"));
+  }
 
-  // 各ラウンド、列席者が順に発言
-  for (let r = 1; r <= discussion.rounds; r++) {
+  for (let i = 0; i < rounds; i++) {
+    const r = startRound + i;
     for (const p of participants) {
       await speak(p, r, personaSystem(p, discussion));
     }
   }
 
-  // 閉会
-  await speak(MODERATOR, discussion.rounds, moderatorSystem(discussion, "close"));
+  // 新規のときだけ閉会の辞(追記時は二重に締めない)
+  if (!isContinue) {
+    await speak(MODERATOR, startRound + rounds - 1, moderatorSystem(discussion, "close"));
+  }
 
   return transcript;
 }
@@ -99,15 +122,14 @@ export interface SummaryResult {
   keyPoints: string[];
 }
 
-/** 議論ログから要約(本文+論点)を生成する。 */
+/** 議論ログから要約(本文+論点)を生成する。司会のモデルを用いる。 */
 export async function summarizeDiscussion(
   settings: Settings,
   discussion: Discussion,
   transcript: Utterance[],
   signal: AbortSignal
 ): Promise<SummaryResult> {
-  const kind = settings.active;
-  const cfg = activeConfig(settings);
+  const { kind, cfg } = resolveProvider(settings, "moderator");
   const log = transcript
     .map((u) => `【${personaById[u.personaId]?.name ?? "?"}】${u.text}`)
     .join("\n");
